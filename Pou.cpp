@@ -2,6 +2,7 @@
 #include <conio.h>
 #include <cstdlib> // Contiene rand() y srand()
 #include <ctime> 
+#include <fstream>
 
 using namespace std;
 
@@ -17,6 +18,7 @@ public:
         int nivel;
         int xp;
 		int inventario[5];
+		int xpNecesaria;
 		/*
 		0 = Hot Dogs
 		recupera hambre, quita salud
@@ -29,6 +31,8 @@ public:
 		4 Pocion estrella
 		recupera todo el stats
 		*/
+		bool hayPartida;
+
 };
 
 void crearPou(Mascota &miPou){ // Función que siempre se hará al iniciar el juego
@@ -38,9 +42,10 @@ cin >> miPou.nombre;
 miPou.hambre = 100;
 miPou.cansancio = 100;
 miPou.salud = 100;
-miPou.monedas = 100;
+miPou.monedas = 0;
 miPou.nivel = 1;
 miPou.xp = 0;
+miPou.hayPartida = true;
 
 for (int i = 0; i < 5; i++){ //Le asigno 0 a cada item del inventario
 	
@@ -95,12 +100,12 @@ dibujarBarra(miPou.cansancio);
 cout << "Salud" << endl;
 dibujarBarra(miPou.salud);
 cout << "Monedas: " << miPou.monedas << endl;
+cout << "Siguiente nivel al " << miPou.xpNecesaria << " de XP"<<endl;
 }
 
 void esperar(){ //Función de espera
-char s;
-cout << "Escribe cualquier letra para continuar" << endl;
-cin >> s;
+cout <<"Presiona cualquier tecla"<<endl;
+getch();
 }
 
 void dibujarPou(Mascota &miPou){ //Funcion para Dibujar A Pou
@@ -117,10 +122,11 @@ cout << "(X.x)" << endl;
 }
 
 void limpiarConsola(){ //Funcion para limpiar la Consola
-
+/*
 for (int i = 0; i < 500; ++i) {
         std::cout << "\n";
-}
+}*/
+system("cls");
 }
 
 void limitarStat(Mascota &miPou){ //Funcion para limitar las stats
@@ -132,6 +138,22 @@ if (miPou.salud < 0) { miPou.salud = 0;}
 if (miPou.hambre > 100) { miPou.hambre = 100;}
 if (miPou.cansancio > 100) { miPou.cansancio = 100;}
 if (miPou.salud > 100) { miPou.salud = 100;}
+
+miPou.xpNecesaria = miPou.nivel * 100;
+
+if (miPou.xp >= miPou.xpNecesaria) {
+        miPou.nivel++;
+        miPou.xp = 0; // Reiniciamos XP para el siguiente nivel
+        miPou.monedas += 50 * miPou.nivel; // ¡Más recompensa por niveles altos!
+        
+        limpiarConsola();
+        cout << "***************************" << endl;
+        cout << "¡SUBIDA DE NIVEL!" << endl;
+        cout << miPou.nombre << " ahora es nivel " << miPou.nivel << endl;
+        cout << "Siguiente nivel requiere: " << (miPou.nivel * 100) << " XP" << endl;
+        cout << "***************************" << endl;
+        esperar();
+    }
 
 }
 
@@ -168,19 +190,23 @@ void comer(Mascota &miPou){
                     case 0: // Hot Dog
                         miPou.hambre += 30;
                         miPou.salud -= 10;
+						miPou.xp += 10;
                         cout << "Le encanto el Hot Dog, pero le dio acidez... (-10 Salud)" << endl;
                         break;
                     case 1: // Manzana
                         miPou.hambre += 15;
+						miPou.xp += 15;
                         cout << "¡Que sano! Una manzana al dia..." << endl;
                         break;
                     case 2: // Espagueti
                         miPou.hambre += 40;
+						miPou.xp += 10;
                         miPou.cansancio -= 20;
                         cout << "Muchos carbohidratos, ahora tiene sueño... (-20 Energia)" << endl;
                         break;
                     case 3: // Pocion
                         miPou.salud += 50;
+						miPou.xp += 20;
                         miPou.hambre -= 10;
                         cout << "¡Salud recuperada! Pero tiene un poco de hambre." << endl;
                         break;
@@ -188,6 +214,7 @@ void comer(Mascota &miPou){
                         miPou.hambre = 100;
                         miPou.salud = 100;
                         miPou.cansancio = 100;
+						miPou.xp += 50;
                         cout << "¡TU MASCOTA ESTA RADIANTE!" << endl;
                         break;
                 }
@@ -220,11 +247,12 @@ void tiendaPou(Mascota &miPou){ //Funcion para la tienda
 	cout<<"Cual deseas comprar?";
 	cin>> eleccion;
 	
-	if (eleccion >= 1 && eleccion <= 5 && miPou.monedas >= precios[eleccion]){
+	if (eleccion >= 1 && eleccion <= 5 && miPou.monedas >= precios[eleccion - 1]){
 		
 		limpiarConsola();
-		miPou.monedas -= precios[eleccion];
+		miPou.monedas -= precios[eleccion - 1];
 		miPou.inventario[eleccion - 1] += 1;
+		miPou.xp += 25;
 		cout<<"Has comprado un " << cosas[eleccion - 1]<< endl;
 		esperar();
 			
@@ -233,14 +261,139 @@ void tiendaPou(Mascota &miPou){ //Funcion para la tienda
 	
 }
 
+void guardarPartida(Mascota &miPou) {
+    ofstream archivo;
+    archivo.open("partida.txt"); // Crea o sobrescribe el archivo
+
+    if (archivo.is_open()) {
+        // Guardamos las variables básicas
+        archivo << miPou.nombre << endl;
+        archivo << miPou.hambre << " " << miPou.cansancio << " " << miPou.salud << endl;
+        archivo << miPou.monedas << " " << miPou.nivel << " " << miPou.xp << endl;
+		archivo << miPou.hayPartida << " " << endl;
+
+        // Guardamos el inventario con un bucle
+        for (int i = 0; i < 5; i++) {
+            archivo << miPou.inventario[i] << " ";
+        }
+		archivo << endl;
+		archivo << miPou.xpNecesaria << endl;
+
+        archivo.close();
+        cout << "¡Partida guardada con exito!" << endl;
+    } else {
+        cout << "Error al abrir el archivo para guardar." << endl;
+    }
+    esperar();
+}
+
+void cargarPartida(Mascota &miPou) {
+    ifstream archivo;
+    archivo.open("partida.txt");
+
+    if (archivo.is_open()) {
+        // Leemos en el mismo orden en que guardamos
+        archivo >> miPou.nombre;
+        archivo >> miPou.hambre >> miPou.cansancio >> miPou.salud;
+        archivo >> miPou.monedas >> miPou.nivel >> miPou.xp;
+		archivo >> miPou.hayPartida;
+
+        for (int i = 0; i < 5; i++) {
+            archivo >> miPou.inventario[i];
+        }
+		archivo >> miPou.xpNecesaria;
+
+        archivo.close();
+        cout << "¡Partida cargada! Bienvenido de nuevo, " << miPou.nombre << endl;
+    } else {
+        cout << "No se encontro partida previa. Creando una nueva..." << endl;
+		crearPou(miPou);
+    }
+    esperar();
+}
+
+void adivinaNumero(Mascota &miPou){
+	
+	int vidas = 5;
+	int numeroAleatorio = rand();
+    int numero = (rand() % 10) + 1;
+	int intentar;
+	int ganancias[2];
+	bool hasGanado = false;
+	
+	limpiarConsola();
+	cout<<"Bienvenido al juego de Adivina el numero del 1 al 10\nTienes "<<vidas<<" intentos para adivinar el numero\n"<< endl;
+	
+	
+	while (vidas > 0 && !hasGanado){
+		cout<<"Escribe un numero:";
+		cin>>intentar;
+		if (intentar == numero){
+			limpiarConsola();
+			cout<<"Felicidades, adivinaste!"<<endl;
+			miPou.monedas += 30 * miPou.nivel;
+			miPou.xp += 25 * miPou.nivel;
+			ganancias[0] = 30 * miPou.nivel;
+			ganancias[1] = 25 * miPou.nivel;
+			hasGanado = true;
+			cout<<"Has ganado "<< ganancias[0] << " de monedas y " << ganancias[1] << " de xp"<< endl;
+			esperar();
+			
+		} else {
+			limpiarConsola();
+			cout<<"Mala ahi, has perdido una vida"<<endl;
+			vidas -= 1;
+			cout<<"Te quedan "<<vidas<<" intentos"<<endl;
+			esperar();
+		}
+		
+		
+	}
+	
+	cout<<"El numero era "<<numero<<"!"<<endl;
+	
+	getch();
+	
+}
+
+void jugarAlgo(Mascota &miPou){
+	
+	int eleccion;
+	
+	limpiarConsola();
+	cout<< "Bienvenidos a la Zona de Juegos, elige que jugar" << endl;
+	cout<< "1. Adivina el numero" << endl;
+	cout<< "2.Regresar" << endl;
+	cin>> eleccion;
+	switch (eleccion){
+		
+		case 1:
+		adivinaNumero(miPou);
+		break;
+		case 2:
+		break;
+	}
+	
+	
+}
+
 int main(){
 
+Mascota miPou;
+srand(time(0));
 int opcion;
 bool Gameloop = true;
 
-Mascota miPou;
-crearPou(miPou);
-esperar();
+ifstream archivoPrueba("partida.txt");
+
+    if (archivoPrueba.good()) { 
+        // Si el archivo existe, lo cerramos y llamamos a cargar
+        archivoPrueba.close();
+        cargarPartida(miPou);
+    } else {
+        // Si no existe, cerramos el intento y creamos mascota nueva
+        archivoPrueba.close();
+    }
 limpiarConsola();
 mostrarStat(miPou);
 dibujarPou(miPou);
@@ -259,6 +412,7 @@ dibujarPou(miPou);
 cin >> opcion;
 switch (opcion){ //comprueba que opcion escogiste
 case 1:
+jugarAlgo(miPou);
 break;
 case 2: //Utilizar objetos del inventario
 comer(miPou);
@@ -291,6 +445,7 @@ limpiarConsola();
 miPou.hambre -= 3;
 miPou.cansancio -= 1;
 miPou.salud -= 2;
+miPou.xp += 1;
 mostrarStat(miPou);
 esperar();
 break;
@@ -302,6 +457,7 @@ break;
 } while (Gameloop); //Aquí termina el Gameloop
 
 limpiarConsola();
+guardarPartida(miPou);
 cout << "Gracias por jugar"<< endl;
 esperar();
 
